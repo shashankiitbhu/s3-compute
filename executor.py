@@ -41,7 +41,8 @@ def run_job(function_name, payload):
         job.meta['success'] = True
         job.save_meta()
 
-        logger.error(f"Job {job.id} failed after {execution_time:.3f}s on {worker_tag}: {str(e)}")        return result
+        logger.info(f"Job {job.id} completed in {execution_time:.3f}s on {worker_tag}")
+        return result
 
     except Exception as e:
         execution_time = time.time() - start_time
