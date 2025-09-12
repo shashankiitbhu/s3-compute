@@ -2,9 +2,11 @@ import os
 import logging
 from flask import Flask, request, jsonify
 from redis import Redis
-from rq import Queue, Job
+from rq import Queue
+from rq.job import Job
 from executor import run_job
 
+# Setup logging
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -17,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-redis_conn = Redis(host='localhost', port=6379, decode_responses=True)
+redis_conn = Redis(host='localhost', port=6379)
 queue = Queue('default', connection=redis_conn)
 
 @app.route('/submit', methods=['POST'])
