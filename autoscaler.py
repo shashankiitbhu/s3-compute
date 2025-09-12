@@ -22,6 +22,8 @@ class Autoscaler:
     def __init__(self):
         self.redis_conn = Redis(host='localhost', port=6379)
         self.queue = Queue('default', connection=self.redis_conn)
+        self.cloud_providers = ['aws', 'gcp']
+        self.worker_counter = {'aws': 0, 'gcp': 0}
         self.workers = []
         self.running = True
         
@@ -30,11 +32,18 @@ class Autoscaler:
         return min(5, max(1, queue_size // 10 + 1))
     
     def spawn_worker(self):
-        """Spawn a new worker process"""
+        """Spawn a new worker process with cloud provider tag"""
         try:
-            process = subprocess.Popen(['python', 'worker.py'])
-            self.workers.append(process)
-            logger.info(f"Spawned worker PID {process.pid}")
+            cloud = self.cloud_providers[len(self.workers) % len(self.cloud_providers)]
+            self.worker_counter[cloud] += 1
+            worker_tag = f"{cloud}-sim-{self.worker_counter[cloud]}"
+            
+            env = os.environ.copy()
+            env['WORKER_TAG'] = worker_tag
+            
+            process = subprocess.Popen(['python', 'worker.py'], env=env)
+            self.workers.append({'process': process, 'tag': worker_tag})
+            logger.info(f"Spawned worker {worker_tag} PID {process.pid}")
             return process
         except Exception as e:
             logger.error(f"Failed to spawn worker: {str(e)}")
@@ -42,26 +51,29 @@ class Autoscaler:
     
     def kill_worker(self):
         """Kill the oldest worker process"""
-        if len(self.workers) > 1: 
-            worker = self.workers.pop(0)
+        if len(self.workers) > 1:  # Keep at least 1 worker
+            worker_info = self.workers.pop(0)
+            worker = worker_info['process']
+            tag = worker_info['tag']
             try:
                 worker.terminate()
                 worker.wait(timeout=10)
-                logger.info(f"Terminated worker PID {worker.pid}")
+                logger.info(f"Terminated worker {tag} PID {worker.pid}")
             except subprocess.TimeoutExpired:
                 worker.kill()
-                logger.warning(f"Force killed worker PID {worker.pid}")
+                logger.warning(f"Force killed worker {tag} PID {worker.pid}")
             except Exception as e:
                 logger.error(f"Error terminating worker: {str(e)}")
     
     def cleanup_dead_workers(self):
         """Remove dead worker processes from list"""
         alive_workers = []
-        for worker in self.workers:
+        for worker_info in self.workers:
+            worker = worker_info['process']
             if worker.poll() is None:
-                alive_workers.append(worker)
+                alive_workers.append(worker_info)
             else:
-                logger.info(f"Removed dead worker PID {worker.pid}")
+                logger.info(f"Removed dead worker {worker_info['tag']} PID {worker.pid}")
         self.workers = alive_workers
     
     def scale_workers(self):
