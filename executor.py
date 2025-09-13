@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import logging
@@ -34,40 +35,42 @@ def run_job(function_name, payload, **kwargs):
     time_rate = 0.05  # cost per second
     try:
         result = None
+        file_path = os.path.join("functions", filename)
+        if not os.path.exists(file_path):
+            raise ImportError(f"Function file {filename} not found")
         if runtime == "python":
-            file_path = os.path.join("functions", filename)
-            if not os.path.exists(file_path):
-                raise ImportError(f"Function file {filename} not found")
-            # Run the file with subprocess
+            docker_cmd = [
+                "docker", "run", "--rm",
+                "-v", f"{os.path.abspath('functions')}:/app",
+                "-e", f"PAYLOAD={json.dumps(payload)}",
+                "python:3.11",
+                "python", f"/app/{filename}"
+            ]
             proc = subprocess.run(
-                ["python3", file_path],
-                input=str(payload),
+                docker_cmd,
                 capture_output=True,
                 text=True,
                 timeout=300
             )
             if proc.returncode != 0:
-                raise RuntimeError(f"Python execution failed: {proc.stderr}")
+                raise RuntimeError(f"Python Docker execution failed: {proc.stderr}")
             result = proc.stdout.strip()
         elif runtime == "node":
-            file_path = os.path.join("functions", filename)
-            if not os.path.exists(file_path):
-                raise ImportError(f"Function file {filename} not found")
             docker_cmd = [
                 "docker", "run", "--rm",
                 "-v", f"{os.path.abspath('functions')}:/app",
+                "-e", f"PAYLOAD={json.dumps(payload)}",
                 "node:18",
                 "node", f"/app/{filename}"
             ]
             proc = subprocess.run(
                 docker_cmd,
-                input=str(payload),
                 capture_output=True,
                 text=True,
                 timeout=300
             )
             if proc.returncode != 0:
-                raise RuntimeError(f"Node execution failed: {proc.stderr}")
+                raise RuntimeError(f"Node Docker execution failed: {proc.stderr}")
             result = proc.stdout.strip()
         else:
             # Default: Python import-based execution (legacy)

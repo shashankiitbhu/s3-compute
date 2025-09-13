@@ -1,6 +1,7 @@
-def handler(payload):
-    numbers = payload.get('numbers', [])
-    if not isinstance(numbers, list):
-        raise ValueError("numbers must be a list")
-    
-    return sum(numbers)
+import os
+import json
+
+payload = os.environ.get("PAYLOAD", "{}")
+data = json.loads(payload)
+numbers = data.get("numbers", [])
+print(sum(numbers))
