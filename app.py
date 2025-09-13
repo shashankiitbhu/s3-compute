@@ -10,6 +10,8 @@ import threading
 import time
 import uuid
 from datetime import datetime
+from werkzeug.utils import secure_filename
+
 # Setup logging
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
@@ -130,15 +132,16 @@ def get_status(job_id):
         result = {
             'job_id': job_id,
             'status': status,
+            'runtime': job.meta.get('runtime'),
+            'filename': job.meta.get('filename'),
             'execution_time': job.meta.get('execution_time'),
             'retries': job.meta.get('retries', 0),
             'worker_tag': job.meta.get('worker_tag'),
-            'cost': job.meta.get('cost', None)
+            'cost': job.meta.get('cost', None),
+            'result': job.result if status == 'finished' else None
         }
         
-        if status == 'finished':
-            result['result'] = job.result
-        elif status == 'failed':
+        if status == 'failed':
             result['error'] = str(job.exc_info)
             
         return jsonify(result)
@@ -146,6 +149,82 @@ def get_status(job_id):
     except Exception as e:
         logger.error(f"Error getting status for job {job_id}: {str(e)}")
         return jsonify({'error': 'Job not found'}), 404
+
+ALLOWED_EXTENSIONS = {'py', 'js'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/upload', methods=['POST'])
+def upload_function():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
+        file = request.files['file']
+        runtime = request.form.get('runtime')
+        payload = request.form.get('payload', '{}')
+
+        if not file or file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+        if not runtime or runtime not in ['python', 'node']:
+            return jsonify({'error': 'Invalid or missing runtime'}), 400
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file extension'}), 400
+
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        unique_name = f"{uuid.uuid4().hex}.{ext}"
+        save_path = os.path.join('functions', secure_filename(unique_name))
+        file.save(save_path)
+
+        # Parse payload if present
+        try:
+            import json
+            payload_dict = json.loads(payload)
+        except Exception:
+            payload_dict = {}
+
+        # Enqueue job with metadata
+        job = queue.enqueue(
+            run_job,
+            unique_name.rsplit('.', 1)[0],  # function_name (without extension)
+            payload_dict,
+            meta={'runtime': runtime, 'filename': unique_name, 'payload': payload_dict}
+        )
+        logger.info(f"Uploaded and enqueued job {job.id} for file {unique_name} with runtime {runtime}")
+        return jsonify({'job_id': job.id, 'filename': unique_name})
+
+    except Exception as e:
+        logger.error(f"Error in /upload: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/ui/upload', methods=['GET'])
+def upload_ui():
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Upload Function</title>
+    </head>
+    <body>
+        <h2>Upload Function</h2>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <label for="file">Code file (.py or .js):</label><br>
+            <input type="file" id="file" name="file" required><br><br>
+            
+            <label for="runtime">Runtime:</label><br>
+            <select id="runtime" name="runtime" required>
+                <option value="python">Python</option>
+                <option value="node">Node</option>
+            </select><br><br>
+            
+            <label for="payload">Payload (JSON):</label><br>
+            <textarea id="payload" name="payload" rows="5" cols="40">{}</textarea><br><br>
+            
+            <input type="submit" value="Upload & Run">
+        </form>
+    </body>
+    </html>
+    '''
 
 if __name__ == '__main__':
     logger.info("Starting Flask app")
