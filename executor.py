@@ -12,6 +12,7 @@ def run_job(function_name, payload):
     Execute a function with the given payload.
     Dynamically imports the function module and calls its handler.
     """
+    worker_tag = os.environ.get('WORKER_TAG', 'unknown-worker')
     job = get_current_job()
     start_time = time.time()
     
@@ -34,18 +35,21 @@ def run_job(function_name, payload):
         cost = base_cost + execution_time * time_rate
         # Store metadata
         job.meta['execution_time'] = execution_time
+        job.meta['worker_tag'] = worker_tag
         job.meta['retries'] = getattr(job, 'retry_count', 0)
         job.meta['success'] = True
         job.meta['cost'] = round(cost, 4)
         job.save_meta()
         logger.info(f"Job {job.id} completed in {execution_time:.3f}s, cost: ${cost:.4f}")
         return result
+
     except Exception as e:
         execution_time = time.time() - start_time
         cost = base_cost + execution_time * time_rate
         job.meta['execution_time'] = execution_time
         job.meta['retries'] = getattr(job, 'retries_left', 0)
         job.meta['success'] = False
+        job.meta['worker_tag'] = worker_tag
         job.meta['cost'] = round(cost, 4)
         job.save_meta()
         logger.error(f"Job {job.id} failed after {execution_time:.3f}s, cost: ${cost:.4f}: {str(e)}")

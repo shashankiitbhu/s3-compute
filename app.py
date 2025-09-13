@@ -132,6 +132,7 @@ def get_status(job_id):
             'status': status,
             'execution_time': job.meta.get('execution_time'),
             'retries': job.meta.get('retries', 0),
+            'worker_tag': job.meta.get('worker_tag'),
             'cost': job.meta.get('cost', None)
         }
         
