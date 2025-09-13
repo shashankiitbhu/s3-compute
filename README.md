@@ -49,6 +49,7 @@ Response:
 {"job_id": "abc123"}
 ```
 
+
 ### Check job status
 ```bash
 curl http://localhost:5000/status/abc123
@@ -61,9 +62,37 @@ Response:
   "status": "finished",
   "result": 15,
   "execution_time": 0.001,
-  "retries": 0
+  "retries": 0,
+  "cost": 0.0101
 }
 ```
+
+## Triggers & Event-Driven Execution
+
+### Register a cron trigger (run every 30 seconds)
+```bash
+curl -X POST http://localhost:5000/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"type": "cron", "function": "sample_sum", "payload": {"numbers": [1,2]}, "interval": 30}'
+```
+
+### Register a webhook trigger
+```bash
+curl -X POST http://localhost:5000/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"type": "webhook", "function": "sample_sleep", "payload": {"seconds": 2}, "event_type": "file_uploaded"}'
+```
+
+### Fire an event to trigger webhook
+```bash
+curl -X POST http://localhost:5000/event \
+  -H "Content-Type: application/json" \
+  -d '{"event_type": "file_uploaded"}'
+```
+
+## Cost Awareness
+
+Each job response includes a simulated cost estimate based on execution time.
 
 ## Available Functions
 

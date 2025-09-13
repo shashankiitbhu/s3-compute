@@ -17,38 +17,36 @@ def run_job(function_name, payload):
     
     logger.info(f"Starting job {job.id} for function {function_name}")
     
+    base_cost = 0.01  # base cost per job
+    time_rate = 0.05  # cost per second
     try:
         # Load function module
         module_path = f"functions/{function_name}.py"
         if not os.path.exists(module_path):
             raise ImportError(f"Function {function_name} not found")
-        
         spec = importlib.util.spec_from_file_location(function_name, module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        
         if not hasattr(module, 'handler'):
             raise AttributeError(f"Function {function_name} missing handler function")
-        
-      
         result = module.handler(payload)
         execution_time = time.time() - start_time
-        
+        cost = base_cost + execution_time * time_rate
         # Store metadata
         job.meta['execution_time'] = execution_time
         job.meta['retries'] = getattr(job, 'retry_count', 0)
         job.meta['success'] = True
+        job.meta['cost'] = round(cost, 4)
         job.save_meta()
-        
-        logger.info(f"Job {job.id} completed in {execution_time:.3f}s")
+        logger.info(f"Job {job.id} completed in {execution_time:.3f}s, cost: ${cost:.4f}")
         return result
-        
     except Exception as e:
         execution_time = time.time() - start_time
+        cost = base_cost + execution_time * time_rate
         job.meta['execution_time'] = execution_time
         job.meta['retries'] = getattr(job, 'retries_left', 0)
         job.meta['success'] = False
+        job.meta['cost'] = round(cost, 4)
         job.save_meta()
-        
-        logger.error(f"Job {job.id} failed after {execution_time:.3f}s: {str(e)}")
+        logger.error(f"Job {job.id} failed after {execution_time:.3f}s, cost: ${cost:.4f}: {str(e)}")
         raise
