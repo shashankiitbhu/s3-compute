@@ -211,6 +211,21 @@ def metrics():
         logger.error(f"Error in /metrics: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/logs')
+def get_logs():
+    """Return the last 100 lines of the autoscaler log."""
+    try:
+        log_path = os.path.join('logs', 'autoscaler.log')
+        if not os.path.exists(log_path):
+            return jsonify({"logs": ["No log file found."]})
+        with open(log_path, 'r') as f:
+            lines = f.readlines()
+        # Return the last 100 lines
+        return jsonify({"logs": lines[-100:]})
+    except Exception as e:
+        logger.error(f"Error reading logs: {str(e)}")
+        return jsonify({"logs": [f"Error: {str(e)}"]})
+
 if __name__ == '__main__':
     logger.info("Starting Flask app")
     app.run(host='0.0.0.0', port=5000, debug=True)

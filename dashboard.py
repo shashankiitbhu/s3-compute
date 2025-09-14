@@ -38,7 +38,6 @@ try:
         # Show metric cards
         col1, col2, col3 = st.columns(3)
         col1.metric("Queue Size", queue_size)
-        col2.metric("Active Workers", active_workers)
         col3.metric("Total Cost ($)", f"{total_cost:.4f}")
 
         # Track history
@@ -121,3 +120,14 @@ else:
 
 st.markdown("---")
 st.markdown("Made with Streamlit · S3-for-Compute")
+
+st.header("Autoscaler Logs")
+try:
+    resp = requests.get("http://localhost:5000/logs")
+    if resp.ok:
+        logs = resp.json().get("logs", [])
+        st.code("".join(logs), language="log")
+    else:
+        st.warning("Could not fetch logs.")
+except Exception as e:
+    st.warning(f"Log fetch failed: {e}")
