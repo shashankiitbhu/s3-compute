@@ -1,12 +1,25 @@
 import streamlit as st
 import requests
 import json
+from datetime import datetime
 
 st.set_page_config(page_title="S3-for-Compute Dashboard", layout="wide")
 st.title("S3-for-Compute: Job Dashboard")
 
-st.sidebar.header("Upload Function & Submit Job")
+# --- Auto-refresh every 5 seconds ---
+if "autorefresh" not in st.session_state:
+    st.session_state.autorefresh = 0
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=5000, key="autorefresh")
 
+# --- Session state for job IDs and metrics history ---
+if "recent_job_ids" not in st.session_state:
+    st.session_state.recent_job_ids = []
+if "metrics_history" not in st.session_state:
+    st.session_state.metrics_history = []
+
+# --- Sidebar: Upload & Submit Job ---
+st.sidebar.header("Upload Function & Submit Job")
 with st.sidebar.form("upload_form"):
     file = st.file_uploader("Code file (.py or .js)", type=["py", "js"])
     runtime = st.selectbox("Runtime", ["python", "node"])
@@ -23,11 +36,13 @@ if submit_upload and file:
         upload_result = resp.json()
         job_id = upload_result.get("job_id")
         st.sidebar.success(f"Job submitted! Job ID: {job_id}")
+        # Store job_id in session state
+        if job_id:
+            st.session_state.recent_job_ids = [job_id] + st.session_state.recent_job_ids[:19]
     except Exception as e:
         st.sidebar.error(f"Upload failed: {e}")
 
 st.header("Job Status & Result")
-
 if job_id:
     status_btn = st.button("Check Job Status", key="status_btn")
     if status_btn:
@@ -47,9 +62,30 @@ else:
         except Exception as e:
             st.error(f"Status fetch failed: {e}")
 
-st.header("Quick Job History (last 5)")
-# This is a placeholder. You can extend with Redis or DB integration for real history.
-st.info("Job history feature coming soon!")
+# --- Recent Jobs Table ---
+st.header("Recent Jobs")
+N = 10
+recent_jobs = []
+for jid in st.session_state.recent_job_ids[:N]:
+    try:
+        resp = requests.get(f"http://localhost:5000/status/{jid}")
+        if resp.ok:
+            job = resp.json()
+            recent_jobs.append({
+                "job_id": jid,
+                "runtime": job.get("runtime", ""),
+                "status": job.get("status", ""),
+                "retries": job.get("retries", 0),
+                "execution_time": job.get("execution_time", 0),
+                "cost": job.get("cost", 0.0),
+            })
+    except Exception:
+        continue
+
+if recent_jobs:
+    st.dataframe(recent_jobs)
+else:
+    st.info("No recent jobs yet.")
 
 st.markdown("---")
 st.markdown("Made with Streamlit · S3-for-Compute")
