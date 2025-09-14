@@ -6,19 +6,16 @@ from datetime import datetime
 st.set_page_config(page_title="S3-for-Compute Dashboard", layout="wide")
 st.title("S3-for-Compute: Job Dashboard")
 
-# --- Auto-refresh every 5 seconds ---
 if "autorefresh" not in st.session_state:
     st.session_state.autorefresh = 0
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=5000, key="autorefresh")
 
-# --- Session state for job IDs and metrics history ---
 if "recent_job_ids" not in st.session_state:
     st.session_state.recent_job_ids = []
 if "metrics_history" not in st.session_state:
     st.session_state.metrics_history = []
 
-# --- Sidebar: Upload & Submit Job ---
 st.sidebar.header("Upload Function & Submit Job")
 with st.sidebar.form("upload_form"):
     file = st.file_uploader("Code file (.py or .js)", type=["py", "js"])
@@ -26,7 +23,6 @@ with st.sidebar.form("upload_form"):
     payload = st.text_area("Payload (JSON)", value="{}", height=100)
     submit_upload = st.form_submit_button("Upload & Submit Job")
 
-# --- Fetch metrics ---
 try:
     resp = requests.get("http://localhost:5000/metrics")
     if resp.ok:
@@ -117,9 +113,6 @@ if recent_jobs:
     st.dataframe(recent_jobs)
 else:
     st.info("No recent jobs yet.")
-
-st.markdown("---")
-st.markdown("Made with Streamlit · S3-for-Compute")
 
 st.header("Autoscaler Logs")
 try:
