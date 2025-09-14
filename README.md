@@ -2,6 +2,8 @@
 
 A distributed compute platform built with Flask, Redis, and RQ, featuring job queuing, event-driven execution, autoscaling workers, and cost tracking.
 
+<img width="1430" height="795" alt="Screenshot 2025-09-14 at 10 52 25 PM" src="https://github.com/user-attachments/assets/2abf4e5b-d458-4f9a-825e-fe08b4569eee" />
+
 ---
 
 ## Features
