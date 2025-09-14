@@ -26,6 +26,38 @@ with st.sidebar.form("upload_form"):
     payload = st.text_area("Payload (JSON)", value="{}", height=100)
     submit_upload = st.form_submit_button("Upload & Submit Job")
 
+# --- Fetch metrics ---
+try:
+    resp = requests.get("http://localhost:5000/metrics")
+    if resp.ok:
+        metrics = resp.json()
+        queue_size = metrics.get("queue_size", 0)
+        active_workers = metrics.get("active_workers", 0)
+        total_cost = metrics.get("total_cost", 0.0)
+
+        # Show metric cards
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Queue Size", queue_size)
+        col2.metric("Active Workers", active_workers)
+        col3.metric("Total Cost ($)", f"{total_cost:.4f}")
+
+        # Track history
+        if "history" not in st.session_state:
+            st.session_state.history = {"time": [], "queue": [], "workers": []}
+        now = datetime.now().strftime("%H:%M:%S")
+        st.session_state.history["time"].append(now)
+        st.session_state.history["queue"].append(queue_size)
+        st.session_state.history["workers"].append(active_workers)
+
+        # Show chart
+        st.line_chart({
+            "Queue Size": st.session_state.history["queue"],
+            "Active Workers": st.session_state.history["workers"],
+        })
+except Exception as e:
+    st.error(f"Metrics fetch failed: {e}")
+
+
 job_id = None
 upload_result = None
 if submit_upload and file:

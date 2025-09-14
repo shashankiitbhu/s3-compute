@@ -5,9 +5,12 @@ import logging
 import importlib.util
 import subprocess
 from rq import get_current_job
+from redis import Redis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+redis_conn = Redis(host='localhost', port=6379)
 
 def run_job(function_name, payload, **kwargs):
     """
@@ -95,6 +98,7 @@ def run_job(function_name, payload, **kwargs):
         job.meta['runtime'] = runtime
         job.meta['filename'] = filename
         job.save_meta()
+        redis_conn.incrbyfloat("total_cost", cost)
         logger.info(f"Job {job.id} completed in {execution_time:.3f}s, cost: ${cost:.4f}")
         return result
 

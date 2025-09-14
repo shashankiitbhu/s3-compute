@@ -196,35 +196,20 @@ def upload_function():
     except Exception as e:
         logger.error(f"Error in /upload: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
-@app.route('/ui/upload', methods=['GET'])
-def upload_ui():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Upload Function</title>
-    </head>
-    <body>
-        <h2>Upload Function</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <label for="file">Code file (.py or .js):</label><br>
-            <input type="file" id="file" name="file" required><br><br>
-            
-            <label for="runtime">Runtime:</label><br>
-            <select id="runtime" name="runtime" required>
-                <option value="python">Python</option>
-                <option value="node">Node</option>
-            </select><br><br>
-            
-            <label for="payload">Payload (JSON):</label><br>
-            <textarea id="payload" name="payload" rows="5" cols="40">{}</textarea><br><br>
-            
-            <input type="submit" value="Upload & Run">
-        </form>
-    </body>
-    </html>
-    '''
+@app.route('/metrics')
+def metrics():
+    try:
+        queue_size = queue.count
+        active_workers = int(redis_conn.get("active_workers") or 0)
+        total_cost = float(redis_conn.get("total_cost") or 0.0)
+        return jsonify({
+            "queue_size": queue_size,
+            "active_workers": active_workers,
+            "total_cost": round(total_cost, 4)
+        })
+    except Exception as e:
+        logger.error(f"Error in /metrics: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     logger.info("Starting Flask app")
